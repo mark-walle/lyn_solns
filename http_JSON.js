@@ -1,23 +1,26 @@
 // HTTP server that serves JSON responses to GET requests
 //
 // node http_uppercaser.js PORT
-
+// 
+// API serves only GET requests
+// 
 // Paths:
 // /api/parsetime?iso=2013-08-10T12:10:15.474Z
+// returns:
 // 	{
 // 	  "hour": 14,
 // 	  "minute": 23,
 // 	  "second": 15
 // 	}
 // /api/unixtime?iso=2013-08-10T12:10:15.474Z
-// 	{ "unixtime": 1376136615474 }
+// returns:
+//	{ "unixtime": 1376136615474 }
+//
+// All others return 400 error
 
-const strftime = require('strftime'),
-	  map  = require('through2-map'),
-	  http = require('http'),
-	  fs   = require('fs');
+const http = require('http'),
+	  url = require('url');
 
-// listen on first argument
 const port = Number(process.argv[2]);
 
 const server = http.createServer((req, res) => {
@@ -25,31 +28,41 @@ const server = http.createServer((req, res) => {
 		res.end('GET requests only.');
 		console.log('recieved a non-GET request');
 	}
-	var pathname = require('url').parse(req.url).pathname
-	console.log(pathname);
-	if (pathname === '/api/parsetime'){
-		// req.pipe(map((chunk) => { 
-		// return chunk.toString().toUpperCase()})).pipe(res)
-		var iso = String(require('url').parse(req.url, true).query.iso)
-		console.log(iso)
-		res.end('reached /api/parsetime' + iso);
-		console.log('/api/parsetime requested');
+
+	var route = url.parse(req.url, true),
+		time = new Date(route.query.iso),
+		result;
+
+	if (route.pathname === '/api/parsetime'){
+		result = parsetime(time);
+	} else if(route.pathname === '/api/unixtime'){
+		result = unixtime(time);
 	}
-	if(pathname === '/api/unixtime'){
-		var iso = String(require('url').parse(req.url, true).query.iso)
-		console.log(iso)
-		// req.pipe(map((chunk) => { 
-		// return chunk.toString()})).pipe(res)
-		res.end('reached /api/unixtime' + iso);
-		console.log('/api/unixtime requested');
+
+	if (result){
+		res.writeHead(200, { 'Content-Type': 'application/json' })
+		res.end(JSON.stringify(result));
+	} else {
+		res.writeHead(400)
+		res.end();
 	}
-	res.end('');
-	return;
 }).on('error', (err) => {
-  // handle errors here
-  throw err;
+	// handle errors here
+	throw err;
 });
 
+function parsetime(time){
+	return {
+		hour : time.getHours(),
+		minute : time.getMinutes(),
+		second : time.getSeconds()
+	};
+}
+
+function unixtime(time){
+	return { unixtime : time.getTime() };
+}
+
 server.listen(port, () => {
-  console.log('POST upper-caser server started on', server.address());
+	console.log('POST upper-caser server started on', server.address());
 });
